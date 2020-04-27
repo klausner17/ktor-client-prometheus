@@ -3,10 +3,10 @@
 Prometheus metrics for ktor client.
 
 ## How to use
-``
-val = HttpClient(CIO) {
+```
+val httpClient = HttpClient(CIO) {
     install(MicrometerMetrics) {
-        meterRegister = PromethesMeterRegistry(PrometheusMeterRegistry.DEFAULT)
+        meterRegister = PrometheusMeterRegistry(PrometheusMeterRegistry.DEFAULT)
     }
 }
-``
+```
