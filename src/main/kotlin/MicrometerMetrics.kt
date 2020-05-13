@@ -60,11 +60,19 @@ class MicrometerMetrics(private val meterRegistry: MeterRegistry,
         override fun install(feature: MicrometerMetrics, scope: HttpClient) {
 
             scope.sendPipeline.intercept(HttpSendPipeline.Before) {
-                feature.before(context)
+                try {
+                    feature.before(context)
+                } finally {
+                    proceed()
+                }
             }
 
             scope.receivePipeline.intercept(HttpReceivePipeline.After) {
-                feature.after(context)
+                try {
+                    feature.after(context)
+                } finally {
+                    proceed()
+                }
             }
 
         }
