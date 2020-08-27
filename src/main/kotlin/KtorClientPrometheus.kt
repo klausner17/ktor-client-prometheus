@@ -1,17 +1,18 @@
-import io.ktor.client.HttpClient
-import io.ktor.client.call.HttpClientCall
-import io.ktor.client.features.HttpClientFeature
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.HttpSendPipeline
-import io.ktor.client.statement.HttpReceivePipeline
-import io.ktor.util.AttributeKey
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.Tag
-import io.micrometer.core.instrument.Timer
-import io.micrometer.prometheus.PrometheusConfig
-import io.micrometer.prometheus.PrometheusMeterRegistry
+package com.klausner.ktor.utils
 
-class MicrometerMetrics(private val meterRegistry: MeterRegistry,
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.features.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.util.*
+import io.micrometer.core.instrument.*
+import io.micrometer.prometheus.*
+
+val AttributeRoute = AttributeKey<String>("route")
+
+class KtorClientMetrics(private val meterRegistry: MeterRegistry,
                         private val timerBuilder: Timer.Builder.(HttpClientCall) -> Unit ) {
 
     class Configuration {
@@ -20,23 +21,24 @@ class MicrometerMetrics(private val meterRegistry: MeterRegistry,
     }
 
     private fun Timer.Builder.customize(call: HttpClientCall) =
-        this.apply { timerBuilder(call) }
+            this.apply { timerBuilder(call) }
 
     private fun RequestMeasure.recordDuration(call: HttpClientCall) {
         timer.stop(Timer.builder(requestTimerName)
-            .addDefaultTags(call)
-            .customize(call)
-            .register(meterRegistry))
+                .publishPercentiles(0.5, 0.9, 0.95, 0.99, 0.999)
+                .addDefaultTags(call)
+                .customize(call)
+                .register(meterRegistry))
     }
 
     private fun Timer.Builder.addDefaultTags(call: HttpClientCall): Timer.Builder {
         tags(
-            listOf(
-                Tag.of("address", "${call.request.url.host}:${call.request.url.port}"),
-                Tag.of("method", call.request.method.value),
-                Tag.of("route", call.request.attributes[measureKey].route ?: call.request.url.encodedPath),
-                Tag.of("status", call.response.status.value.toString())
-            )
+                listOf(
+                        Tag.of("address", "${call.request.url.protocol.name}//${call.request.url.hostWithPort}"),
+                        Tag.of("route", call.request.attributes.getOrNull(AttributeRoute) ?: call.request.url.encodedPath),
+                        Tag.of("method", call.request.method.value),
+                        Tag.of("status", call.response.status.value.toString())
+                )
         )
         return this
     }
@@ -50,14 +52,14 @@ class MicrometerMetrics(private val meterRegistry: MeterRegistry,
     }
 
 
-    companion object Feature : HttpClientFeature<Configuration, MicrometerMetrics> {
+    companion object Feature : HttpClientFeature<Configuration, KtorClientMetrics> {
 
         private const val baseName = "ktor.http.external"
         const val requestTimerName = "$baseName.requests"
         private val measureKey: AttributeKey<RequestMeasure> = AttributeKey("metrics")
-        override val key: AttributeKey<MicrometerMetrics> = AttributeKey("metrics")
+        override val key: AttributeKey<KtorClientMetrics> = AttributeKey("metrics")
 
-        override fun install(feature: MicrometerMetrics, scope: HttpClient) {
+        override fun install(feature: KtorClientMetrics, scope: HttpClient) {
 
             scope.sendPipeline.intercept(HttpSendPipeline.Before) {
                 try {
@@ -77,9 +79,9 @@ class MicrometerMetrics(private val meterRegistry: MeterRegistry,
 
         }
 
-        override fun prepare(block: Configuration.() -> Unit): MicrometerMetrics {
+        override fun prepare(block: Configuration.() -> Unit): KtorClientMetrics {
             val config = Configuration().apply(block)
-            return MicrometerMetrics(config.meterRegistry, config.timerBuilder)
+            return KtorClientMetrics(config.meterRegistry, config.timerBuilder)
         }
     }
 }
