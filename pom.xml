@@ -4,14 +4,15 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.klausner</groupId>
-    <artifactId>ktor-client-prometheus</artifactId>
-    <version>0.1</version>
+    <groupId>com.klausner.ktor.utils</groupId>
+    <artifactId>ktor-client-plugin-prometheus</artifactId>
+    <version>1.0</version>
 
     <properties>
         <kotlin.version>1.6.0</kotlin.version>
         <ktor.version>2.0.0</ktor.version>
         <micrometer.version>1.8.4</micrometer.version>
+        <project></project>
     </properties>
 
     <repositories>
@@ -49,8 +50,8 @@
     </dependencies>
 
     <build>
-        <sourceDirectory>src/main/kotlin</sourceDirectory>
-        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
+        <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
+        <testSourceDirectory>${project.basedir}/src/test/kotlin</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -60,6 +61,12 @@
                     <execution>
                         <id>compile</id>
                         <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>test-compile</id>
                         <goals>
                             <goal>test-compile</goal>
                         </goals>
