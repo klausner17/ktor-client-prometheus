@@ -2,7 +2,7 @@ package com.klausner.ktor.utils
 
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.features.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -20,25 +20,26 @@ class KtorClientMetrics(private val meterRegistry: MeterRegistry,
         var timerBuilder: Timer.Builder.(HttpClientCall) -> Unit = { _ -> }
     }
 
-    private fun Timer.Builder.customize(call: HttpClientCall) =
-            this.apply { timerBuilder(call) }
+    private fun Timer.Builder.customize(call: HttpClientCall) = this.apply { timerBuilder(call) }
 
     private fun RequestMeasure.recordDuration(call: HttpClientCall) {
-        timer.stop(Timer.builder(requestTimerName)
+        timer.stop(
+            Timer.builder(requestTimerName)
                 .publishPercentiles(0.5, 0.9, 0.95, 0.99, 0.999)
                 .addDefaultTags(call)
                 .customize(call)
-                .register(meterRegistry))
+                .register(meterRegistry)
+        )
     }
 
     private fun Timer.Builder.addDefaultTags(call: HttpClientCall): Timer.Builder {
         tags(
-                listOf(
-                        Tag.of("address", "${call.request.url.protocol.name}//${call.request.url.hostWithPort}"),
-                        Tag.of("route", call.request.attributes.getOrNull(AttributeRoute) ?: call.request.url.encodedPath),
-                        Tag.of("method", call.request.method.value),
-                        Tag.of("status", call.response.status.value.toString())
-                )
+            listOf(
+                Tag.of("address", "${call.request.url.protocol.name}://${call.request.url.hostWithPort}"),
+                Tag.of("route", buildTagRoute(call)),
+                Tag.of("method", call.request.method.value),
+                Tag.of("status", call.response.status.value.toString())
+            )
         )
         return this
     }
@@ -51,8 +52,12 @@ class KtorClientMetrics(private val meterRegistry: MeterRegistry,
         clientCall.attributes.getOrNull(measureKey)?.recordDuration(clientCall)
     }
 
+    private fun buildTagRoute(call: HttpClientCall): String {
+        val route = call.request.attributes.getOrNull(AttributeRoute) ?: call.request.url.encodedPath
+        return if (!route.startsWith("/")) { "/${route}" } else route
+    }
 
-    companion object Feature : HttpClientFeature<Configuration, KtorClientMetrics> {
+    companion object Feature : HttpClientPlugin<Configuration, KtorClientMetrics> {
 
         private const val baseName = "ktor.http.external"
         const val requestTimerName = "$baseName.requests"
@@ -71,12 +76,11 @@ class KtorClientMetrics(private val meterRegistry: MeterRegistry,
 
             scope.receivePipeline.intercept(HttpReceivePipeline.After) {
                 try {
-                    feature.after(context)
+                    feature.after(this.subject.call)
                 } finally {
                     proceed()
                 }
             }
-
         }
 
         override fun prepare(block: Configuration.() -> Unit): KtorClientMetrics {
@@ -86,6 +90,8 @@ class KtorClientMetrics(private val meterRegistry: MeterRegistry,
     }
 }
 
-private data class RequestMeasure(val timer: Timer.Sample,
-                                  var route: String? = null,
-                                  var throwable: Throwable? = null)
+private data class RequestMeasure(
+    val timer: Timer.Sample,
+    var route: String? = null,
+    var throwable: Throwable? = null
+)
