@@ -1,3 +1,5 @@
+[![Java CI with Maven](https://github.com/klausner17/ktor-client-prometheus/actions/workflows/maven.yml/badge.svg)](https://github.com/klausner17/ktor-client-prometheus/actions/workflows/maven.yml)
+
 # KTOR CLIENT PROMETHEUS
 ## Description
 Prometheus metrics for ktor client.
