@@ -10,7 +10,7 @@
 
     <properties>
         <kotlin.version>1.6.0</kotlin.version>
-        <ktor.version>2.0.0</ktor.version>
+        <ktor.version>2.3.13</ktor.version>
         <micrometer.version>1.8.4</micrometer.version>
         <project></project>
     </properties>
